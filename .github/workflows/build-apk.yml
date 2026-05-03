@@ -10,52 +10,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm install
 
-      - name: Build Vite app
-        run: npm run build
+      - run: npm run build
 
-      - name: Install Capacitor
+      - name: Install Capacitor CLI + Android
         run: |
-          npm install @capacitor/core @capacitor/android @capacitor/cli
-          npx cap sync android || true
+          npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Set up JDK 17 (FIX JAVA 21 ERROR)
-        uses: actions/setup-java@v4
+      - name: Initialize Capacitor Android (IMPORTANT FIX)
+        run: |
+          npx cap init bible-app com.fountainpdl.bibleapp --web-dir=dist || true
+          npx cap add android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
 
-      - name: Force Gradle Java 17
-        run: echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
+      - run: echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
 
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses || true
+      - run: yes | sdkmanager --licenses || true
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
+      - run: chmod +x android/gradlew
 
-      - name: Build Debug APK
+      - name: Build APK
         run: |
           cd android
           ./gradlew assembleDebug --stacktrace --info --no-daemon
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: bible-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
