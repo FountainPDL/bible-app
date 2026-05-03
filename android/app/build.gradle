@@ -2,12 +2,13 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.fountainpdl.bibleapp"
-    compileSdkVersion 34
+
+    compileSdkVersion 36
 
     defaultConfig {
         applicationId "com.fountainpdl.bibleapp"
         minSdkVersion 22
-        targetSdkVersion 34
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
     }
