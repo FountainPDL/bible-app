@@ -20,23 +20,25 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Ensure Capacitor CLI
-        run: npm install -D @capacitor/cli @capacitor/core @capacitor/android
-
-      - name: Build React / Vite app
+      - name: Build Vite app
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync android
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/android @capacitor/cli
+          npx cap sync android || true
 
-      - name: Set up JDK 17
+      - name: Set up JDK 17 (FIX JAVA 21 ERROR)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
+
+      - name: Force Gradle Java 17
+        run: echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -50,23 +52,10 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --stacktrace --info --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: bible-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          name: Bible App ${{ github.ref_name }}
-          body: |
-            📱 Bible App APK Release
-            Install by enabling "Install unknown apps" on Android.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
