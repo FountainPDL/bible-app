@@ -13,27 +13,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # FIX: Capacitor requires Node 22+
-      - name: Set up Node.js 22
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm install
 
-      - name: Build web app
+      - name: Build React / Vite app
         run: npm run build
 
-      - name: Install Capacitor CLI
-        run: npm install @capacitor/cli @capacitor/core @capacitor/android
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/android @capacitor/cli
+          npm install @capacitor/splash-screen @capacitor/status-bar
 
-      - name: Initialize Capacitor (safe re-init)
-        run: npx cap init bible-app com.fountainpdl.bibleapp --web-dir=dist || true
+      - name: Initialize & add Android platform
+        run: |
+          npx cap add android || true
+          npx cap sync android
 
-      - name: Sync Capacitor
-        run: npx cap sync android
+      - name: Fix AndroidX gradle.properties
+        run: |
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -44,17 +49,33 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept licenses
+      - name: Accept Android licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Build APK
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
         run: |
           cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bible-app-apk
+          name: FountainPDL-Bible-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Create GitHub Release on tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          name: FountainPDL Bible ${{ github.ref_name }}
+          body: |
+            ## FountainPDL's Bible ${{ github.ref_name }}
+            Download the APK below and install on your Android device.
+            > Settings → Security → Install unknown apps → allow your file manager
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
