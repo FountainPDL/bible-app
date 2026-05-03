@@ -1,32 +1,6 @@
 {
-  "appId": "com.fountain.bible",
+  "appId": "com.fountainpdl.bibleapp",
   "appName": "bible-app",
   "webDir": "dist",
-  "bundledWebRuntime": false,
-  "android": {
-    "buildOptions": {
-      "releaseType": "APK"
-    },
-    "allowMixedContent": true,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false
-  },
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 2500,
-      "backgroundColor": "#0f0a1a",
-      "androidScaleType": "CENTER_CROP",
-      "showSpinner": false,
-      "splashFullScreen": true,
-      "splashImmersive": true
-    },
-    "StatusBar": {
-      "style": "Dark",
-      "backgroundColor": "#0f0a1a"
-    },
-    "Keyboard": {
-      "resize": "body",
-      "style": "dark"
-    }
-  }
+  "bundledWebRuntime": false
 }
