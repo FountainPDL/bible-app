@@ -2,5 +2,10 @@
   "appId": "com.fountainpdl.bibleapp",
   "appName": "bible-app",
   "webDir": "dist",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "android": {
+    "buildOptions": {
+      "javaVersion": "17"
+    }
+  }
 }
