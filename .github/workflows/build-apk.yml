@@ -2,80 +2,45 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 22
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: 22
+
+      - name: Setup Java (required for Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build React / Vite app
+      - name: Build web app
         run: npm run build
 
-      - name: Install Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/android @capacitor/cli
-          npm install @capacitor/splash-screen @capacitor/status-bar
+      - name: Sync Capacitor
+        run: npx cap sync android
 
-      - name: Initialize & add Android platform
-        run: |
-          npx cap add android || true
-          npx cap sync android
+      - name: Clean Gradle
+        run: cd android && ./gradlew clean
 
-      - name: Fix AndroidX gradle.properties
-        run: |
-          echo "android.useAndroidX=true" >> android/gradle.properties
-          echo "android.enableJetifier=true" >> android/gradle.properties
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: "17"
-          distribution: "temurin"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: FountainPDL-Bible-APK
+          name: app-debug.apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-
-      - name: Create GitHub Release on tag
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          name: FountainPDL Bible ${{ github.ref_name }}
-          body: |
-            ## FountainPDL's Bible ${{ github.ref_name }}
-            Download the APK below and install on your Android device.
-            > Settings → Security → Install unknown apps → allow your file manager
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
