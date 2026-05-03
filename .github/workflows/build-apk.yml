@@ -10,44 +10,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Use Node 22 (FIX CAPACITOR REQUIREMENT)
+      # FIX: Capacitor requires Node 22+
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
 
-      - run: npm install
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci || npm install
 
-      - name: Install Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Build web app
+        run: npm run build
 
-      - name: Sync Capacitor Android
+      - name: Install Capacitor CLI
+        run: npm install @capacitor/cli @capacitor/core @capacitor/android
+
+      - name: Initialize Capacitor (safe re-init)
+        run: npx cap init bible-app com.fountainpdl.bibleapp --web-dir=dist || true
+
+      - name: Sync Capacitor
         run: npx cap sync android
 
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: "17"
-          cache: gradle
+          distribution: "temurin"
 
-      - run: echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - uses: android-actions/setup-android@v3
-
-      - run: yes | sdkmanager --licenses || true
-
-      - run: chmod +x android/gradlew
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Build APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --info --no-daemon
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: bible-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
