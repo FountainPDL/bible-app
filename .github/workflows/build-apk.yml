@@ -2,45 +2,114 @@ name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-
-      - name: Setup Java (required for Android)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+          node-version: "22"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build web app
+      - name: Build React / Vite app
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync android
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/android @capacitor/cli
+          npm install @capacitor/splash-screen @capacitor/status-bar
 
-      - name: Clean Gradle
-        run: cd android && ./gradlew clean
+      - name: Initialize & add Android platform
+        run: |
+          npx cap add android || true
+          npx cap sync android
 
-      - name: Build APK
-        run: cd android && ./gradlew assembleDebug
+      - name: Fix gradle.properties
+        run: |
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
-      - name: Upload APK
+      - name: Fix package ID in AndroidManifest
+        run: |
+          sed -i 's/package="com.example.app"//' android/app/src/main/AndroidManifest.xml || true
+
+      - name: Inject color resources
+        run: |
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/colors.xml << 'RESEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="colorPrimary">#7B2FBE</color>
+              <color name="colorPrimaryDark">#5a1a9a</color>
+              <color name="colorAccent">#C0392B</color>
+              <color name="colorBackground">#0f0a1a</color>
+          </resources>
+          RESEOF
+
+      - name: Inject styles with SplashScreen theme
+        run: |
+          cat > android/app/src/main/res/values/styles.xml << 'RESEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+                  <item name="colorPrimary">@color/colorPrimary</item>
+                  <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+                  <item name="colorAccent">@color/colorAccent</item>
+              </style>
+              <style name="Theme.SplashScreen" parent="Theme.SplashScreen.IconBackground">
+                  <item name="windowSplashScreenBackground">@color/colorBackground</item>
+                  <item name="postSplashScreenTheme">@style/AppTheme</item>
+              </style>
+          </resources>
+          RESEOF
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug.apk
+          name: FountainPDL-Bible-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Create GitHub Release on tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          name: FountainPDL Bible ${{ github.ref_name }}
+          body: |
+            ## FountainPDL's Bible ${{ github.ref_name }}
+            Download the APK and install on your Android device.
+            > Settings → Security → Install unknown apps → allow your file manager
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
