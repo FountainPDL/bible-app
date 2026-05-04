@@ -40,39 +40,53 @@ jobs:
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      - name: Fix package ID in AndroidManifest
+      - name: Fix namespace in build.gradle
         run: |
-          sed -i 's/package="com.example.app"//' android/app/src/main/AndroidManifest.xml || true
+          if ! grep -q "namespace" android/app/build.gradle; then
+            sed -i "/android {/a\\    namespace 'com.fountainpdl.bible'" android/app/build.gradle
+          fi
+          sed -i 's/applicationId "com.example.app"/applicationId "com.fountainpdl.bible"/' android/app/build.gradle || true
 
-      - name: Inject color resources
+      - name: Remove deprecated package attribute from AndroidManifest
+        run: |
+          sed -i 's/ package="[^"]*"//' android/app/src/main/AndroidManifest.xml || true
+
+      - name: Write colors.xml
         run: |
           mkdir -p android/app/src/main/res/values
-          cat > android/app/src/main/res/values/colors.xml << 'RESEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="colorPrimary">#7B2FBE</color>
-              <color name="colorPrimaryDark">#5a1a9a</color>
-              <color name="colorAccent">#C0392B</color>
-              <color name="colorBackground">#0f0a1a</color>
-          </resources>
-          RESEOF
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
+            '<resources>' \
+            '    <color name="colorPrimary">#7B2FBE</color>' \
+            '    <color name="colorPrimaryDark">#5a1a9a</color>' \
+            '    <color name="colorAccent">#C0392B</color>' \
+            '    <color name="colorBackground">#0F0A1A</color>' \
+            '</resources>' > android/app/src/main/res/values/colors.xml
 
-      - name: Inject styles with SplashScreen theme
+      - name: Write styles.xml
         run: |
-          cat > android/app/src/main/res/values/styles.xml << 'RESEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-                  <item name="colorPrimary">@color/colorPrimary</item>
-                  <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-                  <item name="colorAccent">@color/colorAccent</item>
-              </style>
-              <style name="Theme.SplashScreen" parent="Theme.SplashScreen.IconBackground">
-                  <item name="windowSplashScreenBackground">@color/colorBackground</item>
-                  <item name="postSplashScreenTheme">@style/AppTheme</item>
-              </style>
-          </resources>
-          RESEOF
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
+            '<resources>' \
+            '    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">' \
+            '        <item name="colorPrimary">@color/colorPrimary</item>' \
+            '        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>' \
+            '        <item name="colorAccent">@color/colorAccent</item>' \
+            '        <item name="android:windowBackground">@color/colorBackground</item>' \
+            '    </style>' \
+            '    <style name="Theme.SplashScreen" parent="AppTheme">' \
+            '        <item name="android:windowBackground">@color/colorBackground</item>' \
+            '        <item name="android:windowFullscreen">true</item>' \
+            '    </style>' \
+            '</resources>' > android/app/src/main/res/values/styles.xml
+
+      - name: Write strings.xml
+        run: |
+          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' \
+            '<resources>' \
+            '    <string name="app_name">FountainPDL Bible</string>' \
+            '    <string name="title_activity_main">FountainPDL Bible</string>' \
+            '    <string name="package_name">com.fountainpdl.bible</string>' \
+            '    <string name="custom_url_scheme">com.fountainpdl.bible</string>' \
+            '</resources>' > android/app/src/main/res/values/strings.xml
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -92,7 +106,7 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --warning-mode all 2>&1 | tail -80
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
